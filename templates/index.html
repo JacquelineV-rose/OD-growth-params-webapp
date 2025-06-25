@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>OD Reader WebApp</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 700px; margin: auto; padding: 2rem; }
+        h1 { color: #333; }
+        form { margin-bottom: 2rem; }
+        .button { padding: 0.5rem 1rem; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+        .button:hover { background-color: #45a049; }
+        .file-input { margin-top: 1rem; }
+        img { max-width: 100%; margin-top: 2rem; border: 1px solid #ccc; }
+        .download { margin-top: 1rem; }
+    </style>
+</head>
+<body>
+
+    <h1>OD Growth Curve Analyzer</h1>
+
+    <form method="POST" enctype="multipart/form-data">
+        <label for="file">Upload CSV File:</label>
+        <input class="file-input" type="file" name="file" id="file" required>
+        <br><br>
+        <button class="button" type="submit">Upload and Analyze</button>
+    </form>
+
+    {% if plot_url %}
+        <h2>Growth Curve Plot</h2>
+        <img src="{{ plot_url }}" alt="OD Growth Curve Plot">
+    {% endif %}
+
+    {% if csv_url %}
+        <div class="download">
+            <a href="{{ csv_url }}" class="button" download>Download Results CSV</a>
+        </div>
+    {% endif %}
+
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+</body>
+</html>
