@@ -1,31 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>OD Growth Curve Analyzer</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
 </head>
 <body>
     <h1>OD Growth Curve Analyzer</h1>
 
-    <div class="form-container">
-        <form method="POST" enctype="multipart/form-data">
-            <label>Select a CSV file:</label><br>
-            <input type="file" name="csvfile" accept=".csv" required>
-            <button type="submit">Upload and Analyze</button>
-        </form>
-    </div>
+    <form method="POST" enctype="multipart/form-data">
+        <label for="csvfile">Upload CSV (Tab-separated, raw data from Tecan):</label><br />
+        <input type="file" id="csvfile" name="csvfile" accept=".csv,.tsv,.txt" required />
+        <button type="submit">Analyze</button>
+    </form>
 
     {% if error %}
-        <p class="error">{{ error }}</p>
+        <p style="color: red;">{{ error }}</p>
     {% endif %}
 
-    {% if plot_image and results_file %}
+    {% if plot_image %}
     <div class="results">
-        <h2>Results</h2>
-        <img src="{{ plot_image }}" alt="Growth Curve Plot">
-        <br>
-        <a class="button" href="{{ url_for('download_file', filename=results_file.split('/')[-1]) }}">Download Growth Parameters</a>
+        <h2>Growth Curve Plot</h2>
+        <img src="{{ plot_image }}" alt="Growth Curve Plot" style="max-width: 100%; height: auto;" />
+    </div>
+    {% endif %}
+
+    {% if growth_params %}
+    <div class="metrics">
+        <h2>Growth Parameters</h2>
+        <table border="1" cellpadding="5" cellspacing="0" style="margin: auto;">
+            <thead>
+                <tr>
+                    <th>Well</th>
+                    <th>Growth Rate</th>
+                    <th>Lag Time (Tau)</th>
+                    <th>Max Saturation OD</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in growth_params %}
+                <tr>
+                    <td>{{ row.Well }}</td>
+                    <td>{{ "%.3f"|format(row.GrowthRates) if row.GrowthRates is not none else 'N/A' }}</td>
+                    <td>{{ "%.2f"|format(row.Tau) if row.Tau is not none else 'N/A' }}</td>
+                    <td>{{ "%.3f"|format(row.SaturationOD) if row.SaturationOD is not none else 'N/A' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <br />
+        <a href="{{ url_for('download_file', filename=results_file) }}">Download Results TSV</a>
     </div>
     {% endif %}
 </body>

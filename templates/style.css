@@ -1,24 +1,12 @@
 body {
     font-family: Arial, sans-serif;
-    margin: 40px;
-    background-color: #f7f9fc;
-    color: #333;
+    text-align: center;
+    padding: 30px;
+    background: #f0f0f0;
 }
 
-h1 {
-    color: #2c3e50;
-}
-
-.form-container {
-    margin-bottom: 30px;
-    padding: 20px;
-    border: 1px solid #ddd;
-    background-color: #fff;
-    max-width: 500px;
-}
-
-.results {
-    margin-top: 30px;
+form {
+    margin-bottom: 20px;
 }
 
 .error {
@@ -26,22 +14,17 @@ h1 {
     font-weight: bold;
 }
 
-img {
-    max-width: 100%;
-    border: 1px solid #ccc;
-    margin-top: 10px;
+.results img {
+    max-width: 600px;
+    margin-top: 20px;
 }
 
-a.button {
+.metrics {
+    margin-top: 30px;
+    background: white;
     display: inline-block;
-    margin-top: 10px;
-    padding: 8px 16px;
-    background-color: #3498db;
-    color: white;
-    text-decoration: none;
-    border-radius: 4px;
-}
-
-a.button:hover {
-    background-color: #2980b9;
+    padding: 15px 25px;
+    border-radius: 10px;
+    box-shadow: 0 0 5px #aaa;
+    text-align: left;
 }
