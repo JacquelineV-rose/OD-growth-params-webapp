@@ -8,27 +8,27 @@
 <body>
     <h1>OD Growth Curve Analyzer</h1>
 
-    <form method="POST" enctype="multipart/form-data">
+    <form method="POST" enctype="multipart/form-data" class="upload-form">
         <label for="csvfile">Upload CSV (Tab-separated, raw data from Tecan):</label><br />
         <input type="file" id="csvfile" name="csvfile" accept=".csv,.tsv,.txt" required />
         <button type="submit">Analyze</button>
     </form>
 
     {% if error %}
-        <p style="color: red;">{{ error }}</p>
+        <p class="error">{{ error }}</p>
     {% endif %}
 
     {% if plot_image %}
     <div class="results">
         <h2>Growth Curve Plot</h2>
-        <img src="{{ plot_image }}" alt="Growth Curve Plot" style="max-width: 100%; height: auto;" />
+        <img src="{{ plot_image }}" alt="Growth Curve Plot" />
     </div>
     {% endif %}
 
     {% if growth_params %}
     <div class="metrics">
         <h2>Growth Parameters</h2>
-        <table border="1" cellpadding="5" cellspacing="0" style="margin: auto;">
+        <table class="results-table">
             <thead>
                 <tr>
                     <th>Well</th>
@@ -49,7 +49,7 @@
             </tbody>
         </table>
         <br />
-        <a href="{{ url_for('download_file', filename=results_file) }}">Download Results TSV</a>
+        <a href="{{ url_for('download_file', filename=results_file) }}" class="download-link">Download Results TSV</a>
     </div>
     {% endif %}
 </body>
