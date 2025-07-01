@@ -3,39 +3,38 @@ import pandas as pd
 
 class DataTransformer(ABC):
     @abstractmethod
-    def load_data(self, file_path: str, sep: str = ",") -> pd.DataFrame:
+    def load_data(filepath, sep):
         pass
 
     @abstractmethod
-    def transform_data(self, initial_data: pd.DataFrame) -> pd.DataFrame:
+    def transform_data(initial_data, columns_to_drop=None):
         pass
 
     @abstractmethod
-    def get_transformed_data(self, transformed_data: pd.DataFrame) -> pd.DataFrame:
+    def get_transformed_data(transformed_data):
         pass
+
 
 class TecanDataTransformer(DataTransformer):
-    def load_data(self, file_path: str, sep: str = ",") -> pd.DataFrame:
-        df = pd.read_csv(file_path, sep=sep)
-        return df
+    @staticmethod
+    def load_data(file_path, sep="\t"):
+        return pd.read_csv(file_path, sep=sep)
 
-    def transform_data(self, initial_data: pd.DataFrame) -> pd.DataFrame:
-        # Example transformation: rename time column, drop temp columns
-        time_cols = [col for col in initial_data.columns if "Time" in col]
-        if time_cols:
-            initial_data = initial_data.rename(columns={time_cols[0]: "Time [s]"})
-        temp_cols = [col for col in initial_data.columns if "T°" in col or "Temp" in col]
-        initial_data = initial_data.drop(columns=temp_cols, errors="ignore")
-        return initial_data
+    @staticmethod
+    def transform_data(initial_data, columns_to_drop=['Cycle', 'Temp. [°C]', 'Time_individual[s]', 'T° 600']):
+        # Convert HH:MM:SS to seconds
+        initial_data['Time [s]'] = pd.to_timedelta(initial_data['Time']).dt.total_seconds()
+    
 
-    def get_transformed_data(self, transformed_data: pd.DataFrame) -> pd.DataFrame:
+        # Drop unnecessary columns
+        data = initial_data.drop(columns=columns_to_drop + ['Time'], errors='ignore')
+
+        # Move 'Time [s]' to the front if not already
+        cols = ['Time [s]'] + [col for col in data.columns if col != 'Time [s]']
+        data = data[cols]
+
+        return data
+
+    @staticmethod
+    def get_transformed_data(transformed_data):
         return transformed_data
-
-    # New method to transform a dataframe directly (e.g., from uploaded file)
-    def transform_df(self, df: pd.DataFrame) -> pd.DataFrame:
-        time_cols = [col for col in df.columns if "Time" in col]
-        if time_cols:
-            df = df.rename(columns={time_cols[0]: "Time [s]"})
-        temp_cols = [col for col in df.columns if "T°" in col or "Temp" in col]
-        df = df.drop(columns=temp_cols, errors="ignore")
-        return df

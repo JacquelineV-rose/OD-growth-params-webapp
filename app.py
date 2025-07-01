@@ -1,13 +1,16 @@
-from flask import Flask, request, render_template, send_from_directory, url_for
-import pandas as pd
+from flask import Flask, render_template, request, send_from_directory, url_for
 import os
-
+import pandas as pd
 from src.DataTransformer import TecanDataTransformer
 from src.Wellplate import Wellplate
+from src.Experiment import Experiment
 
 app = Flask(__name__)
-app.config["RESULT_FOLDER"] = "static/results"
-os.makedirs(app.config["RESULT_FOLDER"], exist_ok=True)
+
+# Folder to save results and plots
+RESULT_FOLDER = os.path.join('static', 'results')
+os.makedirs(RESULT_FOLDER, exist_ok=True)
+app.config['RESULT_FOLDER'] = RESULT_FOLDER
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -19,30 +22,40 @@ def index():
     if request.method == "POST":
         file = request.files.get("csvfile")
         if not file:
-            error = "No file uploaded"
+            error = "No file uploaded."
         else:
             try:
-                # Read CSV from uploaded file directly
-                df = pd.read_csv(file, sep=",")  # or sep="\t" if needed
+                # Read CSV
+                df = pd.read_csv(file)
 
-                # Use transformer to clean/transform df
-                transformer = TecanDataTransformer()
-                transformed_df = transformer.transform_df(df)
+                # Convert 'Time' column (HH:MM:SS) to seconds for Wellplate usage
+                df['Time [s]'] = pd.to_timedelta(df['Time']).dt.total_seconds()
+                df['Time'] = df['Time [s]']
 
-                # Pass transformed data to Wellplate
-                plate = Wellplate(layout=(8, 12), well_data=transformed_df)
-                plate.compute_params()
+                # Transform data using your existing transformer
+                transformed_data = TecanDataTransformer.transform_data(df)
+                well_data = TecanDataTransformer.get_transformed_data(transformed_data)
 
-                # Save plot and output file
-                plot_path = os.path.join(app.config["RESULT_FOLDER"], "imageIDEA.png")
+                # Create Wellplate instance
+                plate = Wellplate((16, 24), well_data)
+
+                # Optionally, if you want to use Experiment with multiple plates
+                # experiment = Experiment([plate], title="My Experiment")
+                # experiment.plot_combined_data()
+
+                # Plot raw data and save image
+                plot_path = os.path.join(app.config['RESULT_FOLDER'], 'imageIDEA.png')
                 plate.plot_raw_data(save_path=plot_path)
+                plot_image = url_for('static', filename='results/imageIDEA.png')
 
-                results_file = "results.tsv"
-                results_path = os.path.join(app.config["RESULT_FOLDER"], results_file)
+                # Get growth parameters for display
+                df_growth = plate.get_growth_params()
+                growth_params = df_growth.to_dict(orient="records")
+
+                # Save growth parameters to file
+                results_file = "growth_results.tsv"
+                results_path = os.path.join(app.config['RESULT_FOLDER'], results_file)
                 plate.output_csv(results_path)
-
-                plot_image = url_for("static", filename="results/imageIDEA.png")
-                growth_params = plate.get_growth_params().to_dict(orient="records")
 
             except Exception as e:
                 error = f"Processing error: {str(e)}"

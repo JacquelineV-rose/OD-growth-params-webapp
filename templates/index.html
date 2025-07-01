@@ -34,16 +34,16 @@
                     <th>Well</th>
                     <th>Growth Rate</th>
                     <th>Lag Time (Tau)</th>
-                    <th>Max Saturation OD</th>
+                    <th>Saturation OD</th>
                 </tr>
             </thead>
             <tbody>
-                {% for row in growth_params %}
+               {% for row in growth_params %}
                 <tr>
-                    <td>{{ row.Well }}</td>
-                    <td>{{ "%.3f"|format(row.GrowthRates) if row.GrowthRates is not none else 'N/A' }}</td>
-                    <td>{{ "%.2f"|format(row.Tau) if row.Tau is not none else 'N/A' }}</td>
-                    <td>{{ "%.3f"|format(row.SaturationOD) if row.SaturationOD is not none else 'N/A' }}</td>
+                    <td>{{ row['Well'] }}</td>
+                    <td>{{ "%.3f"|format(row['GrowthRates']) if row['GrowthRates'] is not none else 'N/A' }}</td>
+                    <td>{{ "%.2f"|format(row['tau_values']) if row['tau_values'] is not none else 'N/A' }}</td>
+                    <td>{{ "%.3f"|format(row['saturate_values']) if row['saturate_values'] is not none else 'N/A' }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
