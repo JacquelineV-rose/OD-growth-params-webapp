@@ -13,21 +13,25 @@ class Wellplate():
         self.growth_params = pd.DataFrame()
         self.compute_params()
 
-    def find_tau(self,od_readings, time_points):
+    def find_tau(self, od_readings, time_points, window=3, threshold=0.03):
         od_readings = np.array(od_readings).astype(np.float64)
-        # Check if there are enough readings
+        time_points = np.array(time_points).astype(np.float64)
+
         if len(od_readings) < 5:
-            raise ValueError("Not enough data points to determine τ.")
+            return None, None
 
-        # Iterate through the OD600 readings
-        for i in range(len(od_readings) - 4):
-            # Check if there is an increase in five consecutive readings
-            if all(od_readings[j] < od_readings[j + 1] for j in range(i, i + 4)):
-    #             print("time",time_points[i],i)
-                return time_points[i],i
+    # Smooth the readings to reduce noise
+        smoothed = np.convolve(od_readings, np.ones(window)/window, mode='same')
 
-        # Return None if τ is not found
-        return None,None
+    # Define baseline OD using early readings
+        baseline = np.mean(smoothed[:5])
+
+    # Find first time the smoothed OD exceeds the baseline by a threshold
+        for i, val in enumerate(smoothed):
+            if val > baseline + threshold:
+                return time_points[i], i
+
+        return None, None
     
     def calculateSaturate(self, od_readings):
         od_readings = np.array(od_readings).astype(np.float64)
@@ -82,11 +86,12 @@ class Wellplate():
           # handle the exception
           return None,None
         
-    def calculateGrowth(self,od_readings,time_points):
+    def calculateGrowth(self, od_readings, time_points):
         time_point, start_index = self.find_tau(od_readings, time_points)
-        K , end_index = self.calculateSaturate(od_readings)
-        r = self.calculateInitialGrowthRate(od_readings,time_points,start_index,end_index-1)
-        return r
+        K, end_index = self.calculateSaturate(od_readings)
+        r, growth_rate_index = self.calculateInitialGrowthRate(od_readings, time_points, start_index, end_index-1)
+        return r, growth_rate_index
+
         
     def compute_params(self):
         growth_rates = self.well_data.apply(lambda col: self.calculateGrowth(col, self.time_points)[0])
@@ -110,6 +115,7 @@ class Wellplate():
         aggregrated_growth_data = aggregrated_growth_data.rename_axis('Well').reset_index()
         aggregrated_growth_data["saturation_time"] = saturate_time
         self.growth_params = aggregrated_growth_data
+
     
         
     def plot_raw_data(self, save_path=None): 
