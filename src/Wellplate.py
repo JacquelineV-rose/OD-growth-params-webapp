@@ -24,13 +24,13 @@ class Wellplate():
         smoothed = np.convolve(od_readings, np.ones(window)/window, mode='same')
 
     # Define baseline OD using early readings
-        baseline = np.mean(smoothed[:5])
-
+        baseline = np.mean(smoothed[:window*2])
+        print(f"Baseline OD: {baseline:.4f}, Threshold: {threshold}")
     # Find first time the smoothed OD exceeds the baseline by a threshold
         for i, val in enumerate(smoothed):
             if val > baseline + threshold:
                 return time_points[i], i
-
+        print("Tau not detected")
         return None, None
     
     def calculateSaturate(self, od_readings):
@@ -96,25 +96,30 @@ class Wellplate():
     def compute_params(self):
         growth_rates = self.well_data.apply(lambda col: self.calculateGrowth(col, self.time_points)[0])
         growth_rates_index = self.well_data.apply(lambda col: self.calculateGrowth(col, self.time_points)[1])
-        
+
         tau_values = self.well_data.apply(lambda col: self.find_tau(col, self.time_points)[0])
-        tau_index = self.well_data.apply(lambda col: self.find_tau(col,self.time_points)[1])
-        
-        saturate_values = self.well_data.apply(lambda col:self.calculateSaturate(col)[0])
-        saturate_index = self.well_data.apply(lambda col:self.calculateSaturate(col)[1])
-        saturate_time = self.time_points[saturate_index] 
-        
+        tau_index = self.well_data.apply(lambda col: self.find_tau(col, self.time_points)[1])
+
+        saturate_values = self.well_data.apply(lambda col: self.calculateSaturate(col)[0])
+        saturate_index = self.well_data.apply(lambda col: self.calculateSaturate(col)[1])
+
+    # ✅ FIXED: convert each index to time safely
+        saturate_time = saturate_index.apply(lambda idx: self.time_points[int(idx)] if pd.notna(idx) else np.nan)
+
         aggregrated_growth_data = pd.DataFrame({
             'tau_values': tau_values,
-            'tau_index':tau_index,
-            'GrowthRates':growth_rates,
+            'tau_index': tau_index,
+            'GrowthRates': growth_rates,
             'growth_rates_index': growth_rates_index,
-            'saturate_values':saturate_values,
-            'saturate_index':saturate_index
+            'saturate_values': saturate_values,
+            'saturate_index': saturate_index
         })
+
         aggregrated_growth_data = aggregrated_growth_data.rename_axis('Well').reset_index()
         aggregrated_growth_data["saturation_time"] = saturate_time
+
         self.growth_params = aggregrated_growth_data
+
 
     
         
@@ -132,11 +137,13 @@ class Wellplate():
                 if well_id in self.well_data.columns:
                     tau_index = self.growth_params.loc[self.growth_params['Well'] == well_id, 'tau_index'].iloc[0]
                     if pd.notna(tau_index):
-                        axs[i, j - 1].axvline(x=tau_index, color='red', linestyle='--')
+                        tau_time = self.time_points[int(tau_index)]
+                        axs[i, j - 1].axvline(x=tau_time, color='red', linestyle='--')
 
                     saturation_index = self.growth_params.loc[self.growth_params['Well'] == well_id, 'saturate_index'].iloc[0]
                     if pd.notna(saturation_index):
-                        axs[i, j - 1].axvline(x=saturation_index, color='green', linestyle='--')
+                        saturation_time = self.time_points[int(saturation_index)]
+                        axs[i, j - 1].axvline(x=saturation_time, color='green', linestyle='--')
 
                     axs[i, j - 1].plot(self.well_data[well_id])
                     axs[i, j - 1].set_title(well_id, fontsize=8)
