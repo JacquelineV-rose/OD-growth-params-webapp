@@ -103,7 +103,7 @@ class Wellplate():
         saturate_values = self.well_data.apply(lambda col: self.calculateSaturate(col)[0])
         saturate_index = self.well_data.apply(lambda col: self.calculateSaturate(col)[1])
 
-    # ✅ FIXED: convert each index to time safely
+    
         saturate_time = saturate_index.apply(lambda idx: self.time_points[int(idx)] if pd.notna(idx) else np.nan)
 
         aggregrated_growth_data = pd.DataFrame({
