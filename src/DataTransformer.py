@@ -26,7 +26,7 @@ class TecanDataTransformer(DataTransformer):
         initial_data['Time [s]'] = pd.to_timedelta(initial_data['Time']).dt.total_seconds()
     
 
-        # Drop unnecessary columns
+       
         data = initial_data.drop(columns=columns_to_drop + ['Time'], errors='ignore')
 
         # Move 'Time [s]' to the front if not already

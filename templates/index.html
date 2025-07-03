@@ -40,7 +40,7 @@
 
     fileElem.addEventListener('change', (e) => {
       handleFiles(e.target.files);
-      fileElem.value = ''; // reset input
+      fileElem.value = ''; 
     });
 
     dropArea.addEventListener('dragover', (e) => {
@@ -61,7 +61,6 @@
 
     function handleFiles(files) {
       for (const file of files) {
-        // avoid duplicates by name and size
         if (!uploadedFiles.some(f => f.name === file.name && f.size === file.size)) {
           uploadedFiles.push(file);
         }
@@ -139,7 +138,7 @@
       .catch(err => alert('Upload failed: ' + err.message));
     });
 
-    // Initial render
+    
     renderFileList();
   </script>
 

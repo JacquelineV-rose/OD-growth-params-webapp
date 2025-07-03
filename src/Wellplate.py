@@ -20,13 +20,13 @@ class Wellplate():
         if len(od_readings) < 5:
             return None, None
 
-    # Smooth the readings to reduce noise
+   
         smoothed = np.convolve(od_readings, np.ones(window)/window, mode='same')
 
-    # Define baseline OD using early readings
+   
         baseline = np.mean(smoothed[:window*2])
         print(f"Baseline OD: {baseline:.4f}, Threshold: {threshold}")
-    # Find first time the smoothed OD exceeds the baseline by a threshold
+   
         for i, val in enumerate(smoothed):
             if val > baseline + threshold:
                 return time_points[i], i
@@ -35,9 +35,9 @@ class Wellplate():
     
     def calculateSaturate(self, od_readings):
         od_readings = np.array(od_readings).astype(np.float64)
-        # Calculate saturated density (K)
+      
         max_index = np.argmax(od_readings)
-        # Ensure you're not hitting the boundaries of the array
+      
         if max_index == 0:
             K = np.mean(od_readings[:3])
         elif max_index == len(od_readings) - 1:

@@ -7,18 +7,18 @@ from src.DataTransformer import TecanDataTransformer
 from src.Wellplate import Wellplate
 from src.Experiment import Experiment
 
-# Dash imports
+
 from dash import Dash, html, dcc, Input, Output
 import plotly.graph_objs as go
 
 app = Flask(__name__)
 
-# Folder to save results and plots
+
 RESULT_FOLDER = os.path.join('static', 'results')
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 app.config['RESULT_FOLDER'] = RESULT_FOLDER
 
-# Globals to share data between Flask and Dash
+
 shared_df = pd.DataFrame()
 growth_params_df = pd.DataFrame()
 
@@ -43,27 +43,25 @@ def index():
                 for i, file in enumerate(files):
                     df = pd.read_csv(file)
 
-                    # Convert 'Time' column (HH:MM:SS) to seconds
+                 
                     df['Time [s]'] = pd.to_timedelta(df['Time']).dt.total_seconds()
                     df['Time'] = df['Time [s]']
 
-                    # Transform data
+                 
                     transformed_data = TecanDataTransformer.transform_data(df)
                     well_data = TecanDataTransformer.get_transformed_data(transformed_data)
 
-                    # Create Wellplate instance
                     plate = Wellplate((16, 24), well_data)
 
-                    # Plot raw data and save image
+               
                     plot_path = os.path.join(app.config['RESULT_FOLDER'], f'image_{i}.png')
                     plate.plot_raw_data(save_path=plot_path)
                     plot_images.append(url_for('static', filename=f'results/image_{i}.png'))
 
-                    # Get growth parameters
                     df_growth = plate.get_growth_params()
                     growth_params.extend(df_growth.to_dict(orient="records"))
 
-                    # Save growth parameters to file
+                    
                     result_file = f"growth_results_{i}.tsv"
                     results_path = os.path.join(app.config['RESULT_FOLDER'], result_file)
                     plate.output_csv(results_path)
@@ -72,7 +70,9 @@ def index():
                     all_dataframes.append(well_data)
                     all_growth_params.append(df_growth)
 
-                # Combine all data
+         
+
+
                 shared_df = pd.concat(all_dataframes, axis=1)
                 growth_params_df = pd.concat(all_growth_params, axis=0)
 
@@ -93,11 +93,11 @@ def index():
 def download_file(filename):
     return send_from_directory(app.config["RESULT_FOLDER"], filename, as_attachment=True)
 
-# Helper smoothing function
+
 def moving_average(x, w=3):
     return np.convolve(x, np.ones(w) / w, mode='same')
 
-# Dash app setup
+
 dash_app = Dash(__name__, server=app, url_base_pathname="/interactive/")
 
 @dash_app.server.route("/interactive/")
@@ -109,7 +109,7 @@ dash_app.layout = html.Div([
 
     dcc.Dropdown(
         id="well-dropdown",
-        options=[],  # initially empty
+        options=[], 
         placeholder="Select one or more wells",
         multi=True
     ),
@@ -128,10 +128,10 @@ dash_app.layout = html.Div([
     html.Div(id="hover-info", style={"marginTop": 20, "fontStyle": "italic"})
 ])
 
-# Populate dropdown after shared_df is updated
+
 @dash_app.callback(
     Output("well-dropdown", "options"),
-    Input("growth-graph", "id")  # dummy input to trigger at least once
+    Input("growth-graph", "id") 
 )
 def populate_dropdown(_):
     if shared_df.empty:
@@ -200,7 +200,7 @@ def update_graph(selected_wells, smooth_toggle):
         hovermode="closest"
     )
 
-    hover_info_text = f"Displaying {len(data_traces)} wells. Use zoom, pan, or download PNG from toolbar."
+    hover_info_text = f"Displaying {len(data_traces)} wells. Use ToolBar."
     return fig, hover_info_text
 
 if __name__ == "__main__":
