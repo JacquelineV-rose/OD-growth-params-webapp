@@ -4,7 +4,7 @@ import pandas as pd
 
 class Wellplate(): 
     def __init__(self,layout,well_data,well_plate_name=None,start_time=None): 
-        self.layout = layout
+        self.layout = layout #tuple of (row,col) for example 384 wellplate has layout of (16,24)
         self.time_points = well_data['Time [s]'].astype(np.float64).values
         self.well_data = well_data.drop(['Time [s]'],axis=1)
         self.start_time = start_time
@@ -20,24 +20,24 @@ class Wellplate():
         if len(od_readings) < 5:
             return None, None
 
-  
+   
         smoothed = np.convolve(od_readings, np.ones(window)/window, mode='same')
 
-
-        baseline = np.mean(smoothed[:5])
-
+   
+        baseline = np.mean(smoothed[:window*2])
+        print(f"Baseline OD: {baseline:.4f}, Threshold: {threshold}")
    
         for i, val in enumerate(smoothed):
             if val > baseline + threshold:
                 return time_points[i], i
-
+        print("Tau not detected")
         return None, None
     
     def calculateSaturate(self, od_readings):
         od_readings = np.array(od_readings).astype(np.float64)
-       
+      
         max_index = np.argmax(od_readings)
-     
+      
         if max_index == 0:
             K = np.mean(od_readings[:3])
         elif max_index == len(od_readings) - 1:
@@ -50,11 +50,11 @@ class Wellplate():
         od_readings = np.array(od_readings).astype(np.float64)
 
         try:
-       
+        # Calculate logarithmic slopes
             log_od_readings = np.log(od_readings[start_index:end_index+1])
             slopes = np.gradient(log_od_readings, time_points[start_index:end_index+1])
 
-           
+            #Remove outliers
             Q1, Q3 = np.percentile(slopes, [25, 75])
             
             IQR = Q3 - Q1
@@ -63,10 +63,17 @@ class Wellplate():
             valid_indices = np.where((slopes > lower_bound) & (slopes < upper_bound))[0]
             filtered_slopes = slopes[valid_indices]
             
+#             log_od_readings = np.log(od_readings)
+#             slopes = np.gradient(log_od_readings, time_points)
 
+#             valid_indices = np.arange(0,len(od_readings)+1)
+#             filtered_slopes = slopes
+            
+            # Choose the maximal slope
             max_slope_index = np.argmax(filtered_slopes)
             original_max_slope_index = valid_indices[max_slope_index] + start_index
 
+            # Average the maximal slope with its two neighboring slopes in the original data
             if original_max_slope_index == start_index:
                 r = np.mean(slopes[:start_index+3])
             elif original_max_slope_index == end_index:
@@ -76,7 +83,7 @@ class Wellplate():
 
             return r, original_max_slope_index
         except Exception as e:
-        
+          # handle the exception
           return None,None
         
     def calculateGrowth(self, od_readings, time_points):
@@ -89,25 +96,30 @@ class Wellplate():
     def compute_params(self):
         growth_rates = self.well_data.apply(lambda col: self.calculateGrowth(col, self.time_points)[0])
         growth_rates_index = self.well_data.apply(lambda col: self.calculateGrowth(col, self.time_points)[1])
-        
+
         tau_values = self.well_data.apply(lambda col: self.find_tau(col, self.time_points)[0])
-        tau_index = self.well_data.apply(lambda col: self.find_tau(col,self.time_points)[1])
-        
-        saturate_values = self.well_data.apply(lambda col:self.calculateSaturate(col)[0])
-        saturate_index = self.well_data.apply(lambda col:self.calculateSaturate(col)[1])
-        saturate_time = self.time_points[saturate_index] 
-        
+        tau_index = self.well_data.apply(lambda col: self.find_tau(col, self.time_points)[1])
+
+        saturate_values = self.well_data.apply(lambda col: self.calculateSaturate(col)[0])
+        saturate_index = self.well_data.apply(lambda col: self.calculateSaturate(col)[1])
+
+    
+        saturate_time = saturate_index.apply(lambda idx: self.time_points[int(idx)] if pd.notna(idx) else np.nan)
+
         aggregrated_growth_data = pd.DataFrame({
             'tau_values': tau_values,
-            'tau_index':tau_index,
-            'GrowthRates':growth_rates,
+            'tau_index': tau_index,
+            'GrowthRates': growth_rates,
             'growth_rates_index': growth_rates_index,
-            'saturate_values':saturate_values,
-            'saturate_index':saturate_index
+            'saturate_values': saturate_values,
+            'saturate_index': saturate_index
         })
+
         aggregrated_growth_data = aggregrated_growth_data.rename_axis('Well').reset_index()
         aggregrated_growth_data["saturation_time"] = saturate_time
+
         self.growth_params = aggregrated_growth_data
+
 
     
         
@@ -125,11 +137,13 @@ class Wellplate():
                 if well_id in self.well_data.columns:
                     tau_index = self.growth_params.loc[self.growth_params['Well'] == well_id, 'tau_index'].iloc[0]
                     if pd.notna(tau_index):
-                        axs[i, j - 1].axvline(x=tau_index, color='red', linestyle='--')
+                        tau_time = self.time_points[int(tau_index)]
+                        axs[i, j - 1].axvline(x=tau_time, color='red', linestyle='--')
 
                     saturation_index = self.growth_params.loc[self.growth_params['Well'] == well_id, 'saturate_index'].iloc[0]
                     if pd.notna(saturation_index):
-                        axs[i, j - 1].axvline(x=saturation_index, color='green', linestyle='--')
+                        saturation_time = self.time_points[int(saturation_index)]
+                        axs[i, j - 1].axvline(x=saturation_time, color='green', linestyle='--')
 
                     axs[i, j - 1].plot(self.well_data[well_id])
                     axs[i, j - 1].set_title(well_id, fontsize=8)
@@ -159,8 +173,10 @@ class Wellplate():
         #get raw data point
         data_plot = self.well_data[well_id]
         original_time_point = self.time_points[int(growth_rates_index)]
-  
-        growth_rate_point = data_plot[growth_rates_index] 
+        
+        # start_index = growth_data_parameters["tau_index"]
+        # end_index = growth_data_parameters["saturate_index"]
+        growth_rate_point = data_plot[growth_rates_index] #when representing as a point , (x,y) => (original_time_point,growth_rate_point)
          
         #plot the raw data and the growth point
         plt.plot(self.time_points,data_plot)

@@ -26,10 +26,10 @@ class TecanDataTransformer(DataTransformer):
         initial_data['Time [s]'] = pd.to_timedelta(initial_data['Time']).dt.total_seconds()
     
 
-   
+       
         data = initial_data.drop(columns=columns_to_drop + ['Time'], errors='ignore')
 
-        
+        # Move 'Time [s]' to the front if not already
         cols = ['Time [s]'] + [col for col in data.columns if col != 'Time [s]']
         data = data[cols]
 
