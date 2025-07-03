@@ -4,7 +4,7 @@ import pandas as pd
 
 class Wellplate(): 
     def __init__(self,layout,well_data,well_plate_name=None,start_time=None): 
-        self.layout = layout #tuple of (row,col) for example 384 wellplate has layout of (16,24)
+        self.layout = layout
         self.time_points = well_data['Time [s]'].astype(np.float64).values
         self.well_data = well_data.drop(['Time [s]'],axis=1)
         self.start_time = start_time
@@ -20,13 +20,13 @@ class Wellplate():
         if len(od_readings) < 5:
             return None, None
 
-    # Smooth the readings to reduce noise
+  
         smoothed = np.convolve(od_readings, np.ones(window)/window, mode='same')
 
-    # Define baseline OD using early readings
+
         baseline = np.mean(smoothed[:5])
 
-    # Find first time the smoothed OD exceeds the baseline by a threshold
+   
         for i, val in enumerate(smoothed):
             if val > baseline + threshold:
                 return time_points[i], i
@@ -35,9 +35,9 @@ class Wellplate():
     
     def calculateSaturate(self, od_readings):
         od_readings = np.array(od_readings).astype(np.float64)
-        # Calculate saturated density (K)
+       
         max_index = np.argmax(od_readings)
-        # Ensure you're not hitting the boundaries of the array
+     
         if max_index == 0:
             K = np.mean(od_readings[:3])
         elif max_index == len(od_readings) - 1:
@@ -50,11 +50,11 @@ class Wellplate():
         od_readings = np.array(od_readings).astype(np.float64)
 
         try:
-        # Calculate logarithmic slopes
+       
             log_od_readings = np.log(od_readings[start_index:end_index+1])
             slopes = np.gradient(log_od_readings, time_points[start_index:end_index+1])
 
-            #Remove outliers
+           
             Q1, Q3 = np.percentile(slopes, [25, 75])
             
             IQR = Q3 - Q1
@@ -63,17 +63,10 @@ class Wellplate():
             valid_indices = np.where((slopes > lower_bound) & (slopes < upper_bound))[0]
             filtered_slopes = slopes[valid_indices]
             
-#             log_od_readings = np.log(od_readings)
-#             slopes = np.gradient(log_od_readings, time_points)
 
-#             valid_indices = np.arange(0,len(od_readings)+1)
-#             filtered_slopes = slopes
-            
-            # Choose the maximal slope
             max_slope_index = np.argmax(filtered_slopes)
             original_max_slope_index = valid_indices[max_slope_index] + start_index
 
-            # Average the maximal slope with its two neighboring slopes in the original data
             if original_max_slope_index == start_index:
                 r = np.mean(slopes[:start_index+3])
             elif original_max_slope_index == end_index:
@@ -83,7 +76,7 @@ class Wellplate():
 
             return r, original_max_slope_index
         except Exception as e:
-          # handle the exception
+        
           return None,None
         
     def calculateGrowth(self, od_readings, time_points):
@@ -166,10 +159,8 @@ class Wellplate():
         #get raw data point
         data_plot = self.well_data[well_id]
         original_time_point = self.time_points[int(growth_rates_index)]
-        
-        # start_index = growth_data_parameters["tau_index"]
-        # end_index = growth_data_parameters["saturate_index"]
-        growth_rate_point = data_plot[growth_rates_index] #when representing as a point , (x,y) => (original_time_point,growth_rate_point)
+  
+        growth_rate_point = data_plot[growth_rates_index] 
          
         #plot the raw data and the growth point
         plt.plot(self.time_points,data_plot)
