@@ -46,8 +46,8 @@ def index():
 
                     plate = Wellplate((16, 24), well_data)
 
-                    plot_path = os.path.join(app.config['RESULT_FOLDER'], f'image_{i}.png')
-                    plate.plot_raw_data(save_path=plot_path)
+                    #plot_path = os.path.join(app.config['RESULT_FOLDER'], f'image_{i}.png')
+                    #plate.plot_raw_data(save_path=plot_path)
 
                     df_growth = plate.get_growth_params()
 

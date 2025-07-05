@@ -94,67 +94,89 @@ class Wellplate():
 
         
     def compute_params(self):
-        growth_rates = self.well_data.apply(lambda col: self.calculateGrowth(col, self.time_points)[0])
-        growth_rates_index = self.well_data.apply(lambda col: self.calculateGrowth(col, self.time_points)[1])
+        results = []
 
-        tau_values = self.well_data.apply(lambda col: self.find_tau(col, self.time_points)[0])
-        tau_index = self.well_data.apply(lambda col: self.find_tau(col, self.time_points)[1])
+        for well_name, col in self.well_data.items():
+            tau_val, tau_idx = self.find_tau(col, self.time_points)
+            K_val, K_idx = self.calculateSaturate(col)
+            r_val, r_idx = self.calculateInitialGrowthRate(col, self.time_points, tau_idx, K_idx - 1)
 
-        saturate_values = self.well_data.apply(lambda col: self.calculateSaturate(col)[0])
-        saturate_index = self.well_data.apply(lambda col: self.calculateSaturate(col)[1])
+            results.append({
+                'Well': well_name,
+                'tau_values': tau_val,
+                'tau_index': tau_idx,
+                'GrowthRates': r_val,
+                'growth_rates_index': r_idx,
+                'saturate_values': K_val,
+                'saturate_index': K_idx,
+                'saturation_time': self.time_points[int(K_idx)] if pd.notna(K_idx) else np.nan
+            })
 
-    
-        saturate_time = saturate_index.apply(lambda idx: self.time_points[int(idx)] if pd.notna(idx) else np.nan)
-
-        aggregrated_growth_data = pd.DataFrame({
-            'tau_values': tau_values,
-            'tau_index': tau_index,
-            'GrowthRates': growth_rates,
-            'growth_rates_index': growth_rates_index,
-            'saturate_values': saturate_values,
-            'saturate_index': saturate_index
-        })
-
-        aggregrated_growth_data = aggregrated_growth_data.rename_axis('Well').reset_index()
-        aggregrated_growth_data["saturation_time"] = saturate_time
-
-        self.growth_params = aggregrated_growth_data
-
+        self.growth_params = pd.DataFrame(results)
 
     
         
-    def plot_raw_data(self, save_path=None): 
-        if self.growth_params is None:
-            print("Please call obj.compute_params() to calculate the growth parameters before plotting")
-        else:
-            row_num, col_num = self.layout
-            fig, axs = plt.subplots(row_num, col_num, figsize=(col_num, row_num), sharey=True)
-            rows = "".join([chr(ord('A') + i) for i in range(row_num)])
+    def plot_raw_data(self, save_path=None, wells=None, max_cols=12):
+        """
+        Plot the raw data of the wells, optionally only a subset.
 
-        for i, row in enumerate(rows):
-            for j in range(1, col_num + 1):
-                well_id = f"{row}{j}"
-                if well_id in self.well_data.columns:
-                    tau_index = self.growth_params.loc[self.growth_params['Well'] == well_id, 'tau_index'].iloc[0]
-                    if pd.notna(tau_index):
-                        tau_time = self.time_points[int(tau_index)]
-                        axs[i, j - 1].axvline(x=tau_time, color='red', linestyle='--')
+        Args:
+            save_path (str): if provided, save the figure to this path.
+            wells (list): list of well IDs to plot. If None, plot all available.
+            max_cols (int): number of columns in the figure grid.
+        """
+        import math
 
-                    saturation_index = self.growth_params.loc[self.growth_params['Well'] == well_id, 'saturate_index'].iloc[0]
-                    if pd.notna(saturation_index):
-                        saturation_time = self.time_points[int(saturation_index)]
-                        axs[i, j - 1].axvline(x=saturation_time, color='green', linestyle='--')
+        if self.growth_params is None or self.well_data.empty:
+            print("No data to plot. Please compute parameters first.")
+            return
 
-                    axs[i, j - 1].plot(self.well_data[well_id])
-                    axs[i, j - 1].set_title(well_id, fontsize=8)
-                    axs[i, j - 1].tick_params(labelsize=6)
+        if wells is None:
+            wells = self.well_data.columns.tolist()
 
-        plt.subplots_adjust(hspace=0.75, wspace=0.75)
+        n_wells = len(wells)
+        n_cols = min(max_cols, n_wells)
+        n_rows = math.ceil(n_wells / n_cols)
 
-        # Save or show the plot
+        fig, axs = plt.subplots(n_rows, n_cols,
+                                figsize=(n_cols * 2, n_rows * 2),
+                                squeeze=False,
+                                sharex=True, sharey=True)
+
+        for idx, well_id in enumerate(wells):
+            i, j = divmod(idx, n_cols)
+            ax = axs[i][j]
+
+            if well_id not in self.well_data.columns:
+                ax.axis("off")
+                continue
+
+            y_data = self.well_data[well_id]
+            ax.plot(self.time_points, y_data, label="OD")
+
+        # draw tau and saturation if available
+            growth_row = self.growth_params[self.growth_params["Well"] == well_id]
+            if not growth_row.empty:
+                tau_idx = growth_row["tau_index"].iloc[0]
+                sat_idx = growth_row["saturate_index"].iloc[0]
+                if pd.notna(tau_idx):
+                    ax.axvline(self.time_points[int(tau_idx)], color='red', linestyle='--', lw=0.8, label='Tau')
+                if pd.notna(sat_idx):
+                    ax.axvline(self.time_points[int(sat_idx)], color='green', linestyle='--', lw=0.8, label='Saturation')
+
+            ax.set_title(well_id, fontsize=8)
+            ax.tick_params(labelsize=6)
+
+    # Hide unused axes
+        for idx in range(n_wells, n_rows * n_cols):
+            i, j = divmod(idx, n_cols)
+            axs[i][j].axis("off")
+
+        plt.tight_layout()
+
         if save_path:
-            fig.savefig(save_path, dpi=300, bbox_inches='tight')
-            plt.close()
+            fig.savefig(save_path, dpi=150, bbox_inches='tight')
+            plt.close(fig)
         else:
             plt.show()
     
