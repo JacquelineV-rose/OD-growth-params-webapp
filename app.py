@@ -1,11 +1,12 @@
-from flask import Flask, render_template, request, send_from_directory, url_for, redirect
+from flask import Flask, render_template, request, send_from_directory, redirect, send_file
 import os
 import pandas as pd
 import numpy as np
+import zipfile
+from io import BytesIO
 
 from src.DataTransformer import TecanDataTransformer
 from src.Wellplate import Wellplate
-from src.Experiment import Experiment
 
 from dash import Dash, html, dcc, Input, Output
 import plotly.graph_objs as go
@@ -27,6 +28,9 @@ def index():
     error = None
 
     if request.method == "POST":
+        shared_df = pd.DataFrame()  # reset previous data
+        growth_params_df = pd.DataFrame()
+
         files = request.files.getlist("csvfile")
         if not files or files == [None]:
             error = "No file(s) uploaded."
@@ -38,6 +42,7 @@ def index():
                 for i, file in enumerate(files):
                     df = pd.read_csv(file)
 
+                    # Convert 'Time' column to seconds
                     df['Time [s]'] = pd.to_timedelta(df['Time']).dt.total_seconds()
                     df['Time'] = df['Time [s]']
 
@@ -45,9 +50,6 @@ def index():
                     well_data = TecanDataTransformer.get_transformed_data(transformed_data)
 
                     plate = Wellplate((16, 24), well_data)
-
-                    #plot_path = os.path.join(app.config['RESULT_FOLDER'], f'image_{i}.png')
-                    #plate.plot_raw_data(save_path=plot_path)
 
                     df_growth = plate.get_growth_params()
 
@@ -58,8 +60,19 @@ def index():
                     all_dataframes.append(well_data)
                     all_growth_params.append(df_growth)
 
+                # Concatenate well dataframes side by side
                 shared_df = pd.concat(all_dataframes, axis=1)
+                # Add back 'Time [s]' column for plotting
+                shared_df['Time [s]'] = all_dataframes[0]['Time [s]']
+
+                # Concatenate growth params vertically
                 growth_params_df = pd.concat(all_growth_params, axis=0)
+
+                # Save batch summary CSV
+                growth_params_df.to_csv(
+                    os.path.join(app.config['RESULT_FOLDER'], "batch_summary.tsv"),
+                    sep="\t", index=False
+                )
 
                 return redirect('/interactive/')
 
@@ -77,11 +90,56 @@ def download_file(filename):
     return send_from_directory(app.config["RESULT_FOLDER"], filename, as_attachment=True)
 
 
+@app.route("/download/batch_summary.tsv")
+def download_summary():
+    return send_from_directory(app.config["RESULT_FOLDER"], "batch_summary.tsv", as_attachment=True)
+
+
+@app.route("/download/plots.zip")
+def download_plots():
+    global shared_df
+
+    if shared_df.empty:
+        return "No data loaded. Please upload data first.", 400
+
+    df_with_time = shared_df.copy()
+    plate = Wellplate((16, 24), df_with_time, well_plate_name='current')
+
+    plots_dir = os.path.join(app.config['RESULT_FOLDER'], 'plots')
+    os.makedirs(plots_dir, exist_ok=True)
+
+    # Clear old plots
+    for f in os.listdir(plots_dir):
+        os.remove(os.path.join(plots_dir, f))
+
+    # Generate plots per well, skip time column
+    for well in shared_df.columns:
+        if well == 'Time [s]':
+            continue
+        save_path = os.path.join(plots_dir, f"{well}.png")
+        plate.plot_raw_data(save_path=save_path, wells=[well])
+
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w') as zipf:
+        for filename in os.listdir(plots_dir):
+            filepath = os.path.join(plots_dir, filename)
+            zipf.write(filepath, arcname=filename)
+    zip_buffer.seek(0)
+
+    return send_file(
+        zip_buffer,
+        mimetype='application/zip',
+        download_name='plots.zip',
+        as_attachment=True
+    )
+
+
 def moving_average(x, w=3):
     return np.convolve(x, np.ones(w) / w, mode='same')
 
 
 dash_app = Dash(__name__, server=app, url_base_pathname="/interactive/")
+
 
 @dash_app.server.route("/interactive/")
 def dash_embed():
@@ -94,13 +152,10 @@ dash_app.layout = html.Div([
     html.Label("Select wells (you can type to search):"),
     dcc.Dropdown(
         id="well-dropdown",
-        options=[],  # populated dynamically
+        options=[],
         placeholder="Select one or more wells",
         multi=True,
-        style={
-            "width": "50%",
-            "marginBottom": "20px"
-        }
+        style={"width": "50%", "marginBottom": "20px"}
     ),
 
     dcc.Checklist(
@@ -116,11 +171,20 @@ dash_app.layout = html.Div([
         style={"width": "90vw", "height": "500px", "margin": "0 auto"}
     ),
 
-    html.Div(id="hover-info", style={"marginTop": 20, "fontStyle": "italic"})
+    html.Div(id="hover-info", style={"marginTop": 20, "fontStyle": "italic"}),
+
+    html.Br(),
+
+    html.Div([
+        html.A("📥 Download Batch Summary (.tsv)", href="/download/batch_summary.tsv", target="_blank"),
+        html.Br(),
+        html.A("📥 Download Well Plots (.zip)", href="/download/plots.zip", target="_blank"),
+    ], className="download-buttons"),
+
+
 ])
 
 
-# Dynamically populate dropdown options after data is loaded
 @dash_app.callback(
     Output("well-dropdown", "options"),
     Input("growth-graph", "id")
@@ -163,7 +227,7 @@ def update_graph(selected_wells, smooth_toggle):
                 "Time: %{x:.1f}s<br>"
                 "OD: %{y:.3f}<br>"
                 f"Growth Rate: {gr:.4f}<br>"
-                f"Lag Time (Tau): {tau:.2f}<br>"
+                f"Lag Time (Tau): {tau:.2e}<br>"
                 f"Saturation OD: {sat:.3f}<extra></extra>"
             )
         else:
