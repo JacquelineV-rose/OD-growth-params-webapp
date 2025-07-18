@@ -49,7 +49,10 @@ def index():
                     transformed_data = TecanDataTransformer.transform_data(df)
                     well_data = TecanDataTransformer.get_transformed_data(transformed_data)
 
-                    plate = Wellplate((16, 24), well_data)
+                    plate_shape = Wellplate.detect_plate_layout(well_data.columns)
+                    print(f"Detected plate layout: {plate_shape}")
+                    plate = Wellplate(plate_shape, well_data)
+
 
                     df_growth = plate.get_growth_params()
 
@@ -148,6 +151,25 @@ def dash_embed():
 
 dash_app.layout = html.Div([
     html.H2("Interactive Growth Curve Viewer"),
+
+    html.Div([
+        html.A(
+            "Return to Upload Page",
+            href="/",
+            style={
+                "display": "inline-block",
+                "padding": "8px 16px",
+                "backgroundColor": "#ffffff",
+                "color": "Black",
+                "border": "1px solid #007bff",
+                "textDecoration": "none",
+                "borderRadius": "4px",
+                "marginBottom": "20px",
+                "fontWeight": "bold"
+            }
+        )
+    ]),
+
 
     html.Label("Select wells (you can type to search):"),
     dcc.Dropdown(
