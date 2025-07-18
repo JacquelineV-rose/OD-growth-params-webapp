@@ -242,3 +242,4 @@ if __name__ == "__main__":
     well_plate_rep_1 = Wellplate(plate_shape, well_data, 'repetition_one')
 
     well_plate_rep_1.plot_raw_data()
+
