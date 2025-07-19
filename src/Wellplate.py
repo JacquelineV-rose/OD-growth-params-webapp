@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.ticker import ScalarFormatter
 
 
 class Wellplate:
@@ -8,8 +9,9 @@ class Wellplate:
         """
         Wellplate represents a plate reader experiment.
         """
-        self.layout = layout  # tuple of (rows, cols), e.g., (16,24) for 384-well
+        self.layout = layout  
         self.time_points = well_data['Time [s]'].astype(np.float64).values
+        
         self.well_data = well_data.drop(['Time [s]'], axis=1)
         self.start_time = start_time
 
@@ -173,7 +175,16 @@ class Wellplate:
         fig, axs = plt.subplots(n_rows, n_cols,
                                 figsize=(n_cols * 2, n_rows * 2),
                                 squeeze=False,
-                                sharex=True, sharey=True)
+                                )
+        
+        for ax_row in axs:
+            for ax in ax_row:
+                ax.tick_params(labelleft=True, labelbottom=True)
+                ax.yaxis.set_major_formatter(ScalarFormatter(useMathText=False))
+                ax.yaxis.get_major_formatter().set_scientific(False)
+                ax.xaxis.set_major_formatter(ScalarFormatter(useMathText=False))
+                ax.xaxis.get_major_formatter().set_scientific(False)
+
 
         for idx, well_id in enumerate(wells):
             i, j = divmod(idx, n_cols)
@@ -184,17 +195,19 @@ class Wellplate:
                 continue
 
             y_data = self.well_data[well_id]
-            ax.plot(self.time_points, y_data, label="OD")
+            ax.plot(y_data, label="OD")
 
             growth_row = self.growth_params[self.growth_params["Well"] == well_id]
             if not growth_row.empty:
                 tau_idx = growth_row["tau_index"].iloc[0]
                 sat_idx = growth_row["saturate_index"].iloc[0]
                 if pd.notna(tau_idx):
-                    ax.axvline(self.time_points[int(tau_idx)], color='red', linestyle='--', lw=0.8, label='Tau')
+                    ax.axvline(int(tau_idx), color='red', linestyle='--', lw=0.8, label='Tau')
                 if pd.notna(sat_idx):
-                    ax.axvline(self.time_points[int(sat_idx)], color='green', linestyle='--', lw=0.8, label='Saturation')
+                    ax.axvline(int(sat_idx), color='green', linestyle='--', lw=0.8, label='Saturation')
 
+
+           
             ax.set_title(well_id, fontsize=8)
             ax.tick_params(labelsize=6)
 
@@ -208,6 +221,13 @@ class Wellplate:
             plt.close(fig)
         else:
             plt.show()
+
+    def save_all_well_plots(self, filename='all_wells_plot.png', wells=None):
+        """
+        Convenience method to save all well plots combined into a single image file.
+        """
+        self.plot_raw_data(save_path=filename, wells=wells)
+
 
     def plot_single_well(self, well_id):
         growth_data_parameters = self.growth_params.set_index('Well').loc[well_id]
@@ -228,18 +248,4 @@ class Wellplate:
 
         plt.show()
 
-
-if __name__ == "__main__":
-    from src.DataTransformer import TecanDataTransformer
-
-    data_path = "../data/2023-12-13_task_plate_read_data_rep1.csv"
-    initial_data = TecanDataTransformer.load_data(data_path)
-    transformed_data = TecanDataTransformer.transform_data(initial_data)
-    well_data = TecanDataTransformer.get_transformed_data(transformed_data)
-
-    # 🔷 Auto-detect layout
-    plate_shape = Wellplate.detect_plate_layout(well_data.columns)
-    well_plate_rep_1 = Wellplate(plate_shape, well_data, 'repetition_one')
-
-    well_plate_rep_1.plot_raw_data()
 
