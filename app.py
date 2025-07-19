@@ -98,7 +98,7 @@ def download_summary():
     return send_from_directory(app.config["RESULT_FOLDER"], "batch_summary.tsv", as_attachment=True)
 
 
-@app.route("/download/plots.zip")
+@app.route("/download/plots.png")
 def download_plots():
     global shared_df
 
@@ -108,31 +108,19 @@ def download_plots():
     df_with_time = shared_df.copy()
     plate = Wellplate((16, 24), df_with_time, well_plate_name='current')
 
-    plots_dir = os.path.join(app.config['RESULT_FOLDER'], 'plots')
+    plots_dir = os.path.join(app.config['RESULT_FOLDER'])
     os.makedirs(plots_dir, exist_ok=True)
 
-    # Clear old plots
-    for f in os.listdir(plots_dir):
-        os.remove(os.path.join(plots_dir, f))
+    save_path = os.path.join(plots_dir, "plots.png")
 
-    # Generate plots per well, skip time column
-    for well in shared_df.columns:
-        if well == 'Time [s]':
-            continue
-        save_path = os.path.join(plots_dir, f"{well}.png")
-        plate.plot_raw_data(save_path=save_path, wells=[well])
+    # Generate ONE combined plot of all wells and save as PNG
+    plate.plot_raw_data(save_path=save_path)
 
-    zip_buffer = BytesIO()
-    with zipfile.ZipFile(zip_buffer, 'w') as zipf:
-        for filename in os.listdir(plots_dir):
-            filepath = os.path.join(plots_dir, filename)
-            zipf.write(filepath, arcname=filename)
-    zip_buffer.seek(0)
-
+    # Send the combined PNG file
     return send_file(
-        zip_buffer,
-        mimetype='application/zip',
-        download_name='plots.zip',
+        save_path,
+        mimetype='image/png',
+        download_name='plots.png',
         as_attachment=True
     )
 
@@ -200,7 +188,7 @@ dash_app.layout = html.Div([
     html.Div([
         html.A("📥 Download Batch Summary (.tsv)", href="/download/batch_summary.tsv", target="_blank"),
         html.Br(),
-        html.A("📥 Download Well Plots (.zip)", href="/download/plots.zip", target="_blank"),
+        html.A("📥 Download Well Plots (.png)", href="/download/plots.png", target="_blank"),
     ], className="download-buttons"),
 
 
