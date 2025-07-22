@@ -8,10 +8,17 @@ from io import BytesIO
 from src.DataTransformer import TecanDataTransformer
 from src.Wellplate import Wellplate
 
+
+
 from dash import Dash, html, dcc, Input, Output
 import plotly.graph_objs as go
 
 app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['RESULT_FOLDER'] = 'results'
+
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['RESULT_FOLDER'], exist_ok=True)
 
 RESULT_FOLDER = os.path.join('static', 'results')
 os.makedirs(RESULT_FOLDER, exist_ok=True)
@@ -26,20 +33,25 @@ def index():
     global shared_df, growth_params_df
 
     error = None
+    files = []  
 
     if request.method == "POST":
-        shared_df = pd.DataFrame()  # reset previous data
+        shared_df = pd.DataFrame() 
         growth_params_df = pd.DataFrame()
 
         files = request.files.getlist("csvfile")
-        if not files or files == [None]:
+        if not files or all(f.filename == '' for f in files):
             error = "No file(s) uploaded."
         else:
             try:
                 all_dataframes = []
                 all_growth_params = []
+                time_column = None 
 
                 for i, file in enumerate(files):
+                    if file.filename == '':
+                        continue
+                        
                     df = pd.read_csv(file)
 
                     # Convert 'Time' column to seconds
@@ -48,46 +60,58 @@ def index():
 
                     transformed_data = TecanDataTransformer.transform_data(df)
                     well_data = TecanDataTransformer.get_transformed_data(transformed_data)
+                    
+                    # Store the time column from the first file
+                    if time_column is None:
+                        time_column = well_data['Time [s]'].copy()
+                    
+                    # Remove Time column before renaming to avoid duplicates
+                    well_cols = [col for col in well_data.columns if col != 'Time [s]']
+                    well_data_no_time = well_data[well_cols].copy()
+                    
+                    renamed_cols = {col: f"File{i+1}_{col}" for col in well_cols}
+                    well_data_no_time = well_data_no_time.rename(columns=renamed_cols)
 
                     plate_shape = Wellplate.detect_plate_layout(well_data.columns)
                     print(f"Detected plate layout: {plate_shape}")
                     plate = Wellplate(plate_shape, well_data)
 
-
                     df_growth = plate.get_growth_params()
 
-                    result_file = f"growth_results_{i}.tsv"
+                    result_file = f"growth_results_{i+1}.tsv"
                     results_path = os.path.join(app.config['RESULT_FOLDER'], result_file)
                     plate.output_csv(results_path)
 
-                    all_dataframes.append(well_data)
+                    all_dataframes.append(well_data_no_time)
                     all_growth_params.append(df_growth)
 
-                # Concatenate well dataframes side by side
-                shared_df = pd.concat(all_dataframes, axis=1)
-                # Add back 'Time [s]' column for plotting
-                shared_df['Time [s]'] = all_dataframes[0]['Time [s]']
+                if all_dataframes:  # Only proceed if we have data
+                    # Concatenate well dataframes side by side (without time columns)
+                    shared_df = pd.concat(all_dataframes, axis=1)
+                    # Add back the time column
+                    shared_df['Time [s]'] = time_column
 
-                # Concatenate growth params vertically
-                growth_params_df = pd.concat(all_growth_params, axis=0)
+                    # Concatenate growth params vertically
+                    growth_params_df = pd.concat(all_growth_params, axis=0, ignore_index=True)
 
-                # Save batch summary CSV
-                growth_params_df.to_csv(
-                    os.path.join(app.config['RESULT_FOLDER'], "batch_summary.tsv"),
-                    sep="\t", index=False
-                )
+                    # Save batch summary CSV
+                    growth_params_df.to_csv(
+                        os.path.join(app.config['RESULT_FOLDER'], "batch_summary.tsv"),
+                        sep="\t", index=False
+                    )
 
-                return redirect('/interactive/')
+                    return redirect('/interactive/')
+                else:
+                    error = "No valid files processed."
 
             except Exception as e:
                 error = f"Processing error: {str(e)}"
+                print(f"Debug - Error details: {e}")
 
     return render_template(
         "index.html",
         error=error
     )
-
-
 @app.route("/download/<filename>")
 def download_file(filename):
     return send_from_directory(app.config["RESULT_FOLDER"], filename, as_attachment=True)
@@ -132,10 +156,6 @@ def moving_average(x, w=3):
 dash_app = Dash(__name__, server=app, url_base_pathname="/interactive/")
 
 
-@dash_app.server.route("/interactive/")
-def dash_embed():
-    return dash_app.index()
-
 
 dash_app.layout = html.Div([
     html.H2("Interactive Growth Curve Viewer"),
@@ -159,14 +179,28 @@ dash_app.layout = html.Div([
     ]),
 
 
-    html.Label("Select wells (you can type to search):"),
-    dcc.Dropdown(
-        id="well-dropdown",
-        options=[],
-        placeholder="Select one or more wells",
-        multi=True,
-        style={"width": "50%", "marginBottom": "20px"}
-    ),
+    html.Label("Select wells (you can type to search):", style={"marginBottom": "10px", "display": "block"}),
+    
+
+    html.Div([
+        dcc.Dropdown(
+            id="well-dropdown-1",
+            options=[],
+            placeholder="Select wells from File 1",
+            multi=True,
+            style={"width": "100%"}
+        ),
+    ], style={"width": "45%", "display": "inline-block", "marginRight": "5%", "verticalAlign": "top"}),
+
+    html.Div([
+        dcc.Dropdown(
+            id="well-dropdown-2",
+            options=[],
+            placeholder="Select wells from File 2",
+            multi=True,
+            style={"width": "100%"}
+        ),
+    ], style={"width": "45%", "display": "inline-block", "verticalAlign": "top"}),
 
     dcc.Checklist(
         id="smooth-toggle",
@@ -186,37 +220,60 @@ dash_app.layout = html.Div([
     html.Br(),
 
     html.Div([
-        html.A("📥 Download Batch Summary (.tsv)", href="/download/batch_summary.tsv", target="_blank"),
+        html.A("Download Batch Summary (.tsv)", href="/download/batch_summary.tsv", target="_blank"),
         html.Br(),
-        html.A("📥 Download Well Plots (.png)", href="/download/plots.png", target="_blank"),
+        html.A(" Download Well Plots (.png)", href="/download/plots.png", target="_blank"),
     ], className="download-buttons"),
 
 
 ])
 
 
+
 @dash_app.callback(
-    Output("well-dropdown", "options"),
-    Input("growth-graph", "id")
+    [Output("well-dropdown-1", "options"),
+     Output("well-dropdown-2", "options")],
+    [Input("well-dropdown-1", "id")]
 )
-def populate_dropdown(_):
+def populate_dropdowns(_):
+    try:
+        if shared_df.empty:
+            return [], []
+        
+        print(f"Debug - DataFrame columns: {list(shared_df.columns)}")  # Debug line
+        
+        options_1 = [{"label": col.replace("File1_", ""), "value": col} 
+                     for col in shared_df.columns if col.startswith("File1_")]
+        options_2 = [{"label": col.replace("File2_", ""), "value": col} 
+                     for col in shared_df.columns if col.startswith("File2_")]
+        
+        print(f"Debug - Options 1: {len(options_1)}, Options 2: {len(options_2)}")  # Debug line
+        
+        return options_1, options_2
+    except Exception as e:
+        print(f"Debug - Dropdown error: {e}")
+        return [], []
+
+
+@dash_app.callback(
+    [Output("growth-graph", "figure"),
+     Output("hover-info", "children")],
+    [Input("well-dropdown-1", "value"),
+     Input("well-dropdown-2", "value"),
+     Input("smooth-toggle", "value")]
+)
+def update_graph(selected_wells_1, selected_wells_2, smooth_toggle):
     if shared_df.empty:
-        return []
-    return [{"label": col, "value": col} for col in shared_df.columns if col != "Time [s]"]
-
-
-@dash_app.callback(
-    Output("growth-graph", "figure"),
-    Output("hover-info", "children"),
-    Input("well-dropdown", "value"),
-    Input("smooth-toggle", "value")
-)
-def update_graph(selected_wells, smooth_toggle):
-    if not selected_wells or shared_df.empty:
+        return go.Figure(), "No data loaded. Please upload files first."
+    
+    if not selected_wells_1 and not selected_wells_2:
         return go.Figure(), "Select wells to display growth curves."
 
-    show_smooth = "smooth" in smooth_toggle
+    show_smooth = "smooth" in (smooth_toggle or [])
     data_traces = []
+
+    # Combine wells from both dropdowns
+    selected_wells = (selected_wells_1 or []) + (selected_wells_2 or [])
 
     for well in selected_wells:
         if well not in shared_df.columns:
@@ -227,7 +284,10 @@ def update_graph(selected_wells, smooth_toggle):
 
         y_plot = moving_average(y_data, w=5) if show_smooth else y_data
 
-        params = growth_params_df[growth_params_df["Well"] == well]
+        # Extract the original well name for lookup (remove File1_ or File2_ prefix)
+        original_well = well.split('_', 1)[1] if '_' in well else well
+        params = growth_params_df[growth_params_df["Well"] == original_well]
+        
         if not params.empty:
             gr = params["GrowthRates"].values[0]
             tau = params["tau_values"].values[0]
@@ -266,7 +326,6 @@ def update_graph(selected_wells, smooth_toggle):
 
     hover_info_text = f"Displaying {len(data_traces)} wells."
     return fig, hover_info_text
-
 
 if __name__ == "__main__":
     app.run(debug=True)
