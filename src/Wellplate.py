@@ -96,7 +96,7 @@ class Wellplate:
 
             if len(filtered_slopes) == 0:
                 return None, None
-
+                                                                                                    
             max_idx = np.argmax(filtered_slopes)
             original_idx = valid_indices[max_idx] + start_index
 
