@@ -171,12 +171,6 @@ dash_app.layout = html.Div([
         )
     ]),
 
-    dcc.Interval(
-        id='interval-component',
-        interval=1000,
-        n_intervals=0,
-        max_intervals=10
-    ),
 
     dcc.Store(id="data-store"),
 
@@ -210,9 +204,9 @@ dash_app.layout = html.Div([
 
 @dash_app.callback(
     Output("data-store", "data"),
-    [Input("interval-component", "n_intervals")]
+    [Input("dropdown-container", "id")] 
 )
-def update_data_store(n):
+def update_data_store(_):
     global num_files, shared_df, data_timestamp
 
     return {
@@ -250,7 +244,7 @@ def update_dropdown_container(data_state):
 
         dropdowns.append(
             dcc.Dropdown(
-                id={'type': 'well-dropdown', 'index': i},  # ✅ fixed to pattern-matching
+                id={'type': 'well-dropdown', 'index': i},  
                 options=options,
                 placeholder=f"Select wells from File {i}",
                 multi=True,
