@@ -5,14 +5,18 @@ const analyzeBtn = document.getElementById("analyze-btn");
 
 dropZone.addEventListener("click", () => fileInput.click());
 
+
+
 dropZone.addEventListener("dragover", (e) => {
     e.preventDefault();
     dropZone.classList.add("dragover");
 });
 
+
 dropZone.addEventListener("dragleave", () => {
     dropZone.classList.remove("dragover");
 });
+
 
 dropZone.addEventListener("drop", (e) => {
     e.preventDefault();
@@ -21,18 +25,23 @@ dropZone.addEventListener("drop", (e) => {
     updateFileList();
 });
 
+
+
 fileInput.addEventListener("change", updateFileList);
 
-function updateFileList() {
+
+function updateFileList(){
     fileList.innerHTML = "";
-    if (fileInput.files.length > 0) {
+
+
+    if (fileInput.files.length > 0){
         Array.from(fileInput.files).forEach(file => {
             const item = document.createElement("div");
             item.textContent = file.name;
             fileList.appendChild(item);
         });
         analyzeBtn.disabled = false;
-    } else {
+    } else{
         analyzeBtn.disabled = true;
     }
 }
