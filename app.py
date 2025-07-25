@@ -5,6 +5,10 @@ import numpy as np
 import time
 import tempfile
 import shutil
+import time
+import threading
+from datetime import datetime, timedelta
+import glob
 
 from src.DataTransformer import TecanDataTransformer
 from src.Wellplate import Wellplate
@@ -21,12 +25,12 @@ app.config['RESULT_FOLDER'] = 'results'
 
 
 
-
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['RESULT_FOLDER'], exist_ok=True)
 
 
-
+TEMP_UPLOAD_DIR = os.path.join(app.root_path, 'temp_uploads')
+os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
 
 RESULT_FOLDER = os.path.join('static', 'results')
 os.makedirs(RESULT_FOLDER, exist_ok=True)
@@ -37,6 +41,30 @@ shared_df = pd.DataFrame()
 growth_params_df = pd.DataFrame()
 num_files = 0
 data_timestamp = 0
+
+def delete_file_after_a_day(path, delay=86400):
+    def delayed_delete():
+        time.sleep(delay)
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+                print(f"[Cleanup] Deleted temp file: {path}")
+            except Exception as e:
+                print(f"[Cleanup Error] Failed to delete {path}: {e}")
+    threading.Thread(target=delayed_delete, daemon=True).start()
+
+
+
+def cleanup_old_files(folder, hours=24):
+    cutoff_time = datetime.now() - timedelta(hours=hours)
+    for filepath in glob.glob(os.path.join(folder, '*.csv')):
+        file_time = datetime.fromtimestamp(os.path.getmtime(filepath))
+        if file_time < cutoff_time:
+            print(f"Deleting old file: {filepath}")
+            try:
+                os.remove(filepath)
+            except Exception as e:
+                print(f"Failed to delete {filepath}: {e}")
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -75,21 +103,24 @@ def index():
                         continue
 
                     # Save to temp file
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
-                        print(f"Creating temp file at {tmp.name}")
-                        file.save(tmp.name)
-                        tmp_path = tmp.name
+                    filename = file.filename
+                    tmp_path = os.path.join(TEMP_UPLOAD_DIR, filename)
+                    file.save(tmp_path)
+                    print(f"Saved uploaded file to temp uploads dir: {tmp_path}")
+
+
+                    delete_file_after_a_day(tmp_path)
 
                   
                     df = pd.read_csv(tmp_path)
-                    #Debugging statement
-                    print(f"deleting temp file at {tmp_path}")
+                  
+                    
                    
 
-                    os.remove(tmp_path)
+                   
 
                   
-                    df['Time [s]'] = pd.to_timedelta(df['Time']).dt.total_seconds()
+                    df['Time [s]'] = pd.to_timedelta(df['Time']).dt.total_seconds() / 3600
 
                     transformed_data = TecanDataTransformer.transform_data(df)
                     well_data = TecanDataTransformer.get_transformed_data(transformed_data)
@@ -226,14 +257,14 @@ dash_app.layout = html.Div([
     html.Div(id="status-div", style={"marginBottom": "20px"}),
 
     html.Div(id="dropdown-container"),
-
+    
     dcc.Checklist(
         id="smooth-toggle",
         options=[{"label": "Smooth Curve", "value": "smooth"}],
         value=[],
-        style={"marginBottom": "20px"}
+        labelStyle={"marginRight": "20px"}
     ),
-
+       
 
 
     dcc.Graph(
@@ -376,7 +407,7 @@ def update_graph(selected_wells_lists, smooth_toggle):
 
 
     for well in selected_wells:
-        x_data = shared_df["Time [s]"].values
+        x_data = shared_df["Time [s]"].values / 3600
         y_data = shared_df[well].values
         y_plot = moving_average(y_data, w=5) if show_smooth else y_data
 
@@ -391,7 +422,7 @@ def update_graph(selected_wells_lists, smooth_toggle):
     fig = go.Figure(data=data_traces)
     fig.update_layout(
         title="Growth Curves",
-        xaxis_title="Time (seconds)",
+        xaxis_title="Time (hours)",
         yaxis_title="OD600",
         hovermode="closest"
     )
@@ -400,4 +431,5 @@ def update_graph(selected_wells_lists, smooth_toggle):
     return fig, f"Displaying {len(data_traces)} wells."
 
 if __name__ == "__main__":
+    cleanup_old_files('path_to_temp_folder')
     app.run(debug=True)
