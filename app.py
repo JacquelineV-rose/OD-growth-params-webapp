@@ -42,6 +42,7 @@ growth_params_df = pd.DataFrame()
 num_files = 0
 data_timestamp = 0
 
+
 def delete_file_after_a_day(path, delay=86400):
     def delayed_delete():
         time.sleep(delay)
@@ -57,14 +58,17 @@ def delete_file_after_a_day(path, delay=86400):
 
 def cleanup_old_files(folder, hours=24):
     cutoff_time = datetime.now() - timedelta(hours=hours)
-    for filepath in glob.glob(os.path.join(folder, '*.csv')):
-        file_time = datetime.fromtimestamp(os.path.getmtime(filepath))
-        if file_time < cutoff_time:
-            print(f"Deleting old file: {filepath}")
-            try:
-                os.remove(filepath)
-            except Exception as e:
-                print(f"Failed to delete {filepath}: {e}")
+    for filepath in glob.glob(os.path.join(folder, '*')):
+
+        if filepath.endswith('.csv') or filepath.endswith('.png') or filepath.endswith('.tsv'):
+
+            file_time = datetime.fromtimestamp(os.path.getmtime(filepath))
+            if file_time < cutoff_time:
+                print(f"Deleting old file: {filepath}")
+                try:
+                    os.remove(filepath)
+                except Exception as e:
+                    print(f"Failed to delete {filepath}: {e}")
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -120,7 +124,7 @@ def index():
                    
 
                   
-                    df['Time [s]'] = pd.to_timedelta(df['Time']).dt.total_seconds() / 3600
+                    df['Time [s]'] = pd.to_timedelta(df['Time']).dt.total_seconds() 
 
                     transformed_data = TecanDataTransformer.transform_data(df)
                     well_data = TecanDataTransformer.get_transformed_data(transformed_data)
@@ -129,7 +133,7 @@ def index():
 
                     if time_column is None:
                         time_column = well_data['Time [s]'].copy()
-
+                        
                     well_cols = [col for col in well_data.columns if col != 'Time [s]']
                     well_data_no_time = well_data[well_cols].copy()
 
@@ -154,6 +158,7 @@ def index():
                     num_files = valid_file_count
 
                     shared_df = pd.concat(all_dataframes, axis=1)
+
                     shared_df['Time [s]'] = time_column
 
                     growth_params_df = pd.concat(all_growth_params, axis=0, ignore_index=True)
@@ -198,7 +203,7 @@ def download_plots():
 
 
     if shared_df.empty:
-        return "No data loaded. Upload data again.", 400
+        return "No data loaded. Please upload again.", 400
 
 
     df_with_time = shared_df.copy()
@@ -208,14 +213,19 @@ def download_plots():
     plots_dir = os.path.join(app.config['RESULT_FOLDER'])
     os.makedirs(plots_dir, exist_ok=True)
 
-    save_path = os.path.join(plots_dir, "plots.png")
+    
+    timestamp = int(time.time())
+    filename = f"plots_{timestamp}.png"
+    save_path = os.path.join(plots_dir, filename)
+
+
     plate.plot_raw_data(save_path=save_path)
 
 
     return send_file(
         save_path,
         mimetype='image/png',
-        download_name='plots.png',
+        download_name=filename,
         as_attachment=True
     )
 
@@ -407,7 +417,7 @@ def update_graph(selected_wells_lists, smooth_toggle):
 
 
     for well in selected_wells:
-        x_data = shared_df["Time [s]"].values / 3600
+        x_data = shared_df["Time [s]"].values 
         y_data = shared_df[well].values
         y_plot = moving_average(y_data, w=5) if show_smooth else y_data
 
@@ -422,7 +432,7 @@ def update_graph(selected_wells_lists, smooth_toggle):
     fig = go.Figure(data=data_traces)
     fig.update_layout(
         title="Growth Curves",
-        xaxis_title="Time (hours)",
+        xaxis_title="Time (Seconds)",
         yaxis_title="OD600",
         hovermode="closest"
     )
@@ -432,4 +442,6 @@ def update_graph(selected_wells_lists, smooth_toggle):
 
 if __name__ == "__main__":
     cleanup_old_files(TEMP_UPLOAD_DIR)
+    cleanup_old_files(app.config['RESULT_FOLDER'])
+
     app.run(debug=True)
