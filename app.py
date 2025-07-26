@@ -431,5 +431,5 @@ def update_graph(selected_wells_lists, smooth_toggle):
     return fig, f"Displaying {len(data_traces)} wells."
 
 if __name__ == "__main__":
-    cleanup_old_files('path_to_temp_folder')
+    cleanup_old_files(TEMP_UPLOAD_DIR)
     app.run(debug=True)
