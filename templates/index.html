@@ -5,15 +5,23 @@
   <title>Upload OD Data Files</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
 
+
 </head>
 <body>
+
+
   <h1>Upload OD Data Files</h1>
 
-  <div id="drop-area">
+
+
+
+<div id="drop-area">
   <p>Drag & drop files here or click to browse</p>
   <input type="file" name='csvfile' id="fileElem" multiple style="display:none" />
   <button id="browseBtn" type="button">Browse Files</button>
 </div>
+
+
 
 
   <h3>Files to analyze:</h3>
@@ -25,10 +33,13 @@
 
 
 
-    <div id="loadingIndicator" style="display:none;">
-        <div class="spinner"></div>
-        <span>Processing files....</span>
-    </div>
+
+  <div id="loadingIndicator" style="display:none;">
+      <div class="spinner"></div>
+      <span>Processing files....</span>
+  </div>
+
+
 
   <script>
     const dropArea = document.getElementById('drop-area');
@@ -37,95 +48,131 @@
     const fileListDiv = document.getElementById('file-list');
     const uploadForm = document.getElementById('uploadForm');
 
+
     let uploadedFiles = [];
+
 
     browseBtn.addEventListener('click', () => fileElem.click());
 
-    fileElem.addEventListener('change', (e) => {
-      handleFiles(e.target.files);
-      fileElem.value = ''; 
-    });
+  fileElem.addEventListener('change', (e) => {
+    handleFiles(e.target.files);
+    fileElem.value = ''; 
+});
 
-    dropArea.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropArea.style.borderColor = 'blue';
-    });
+  dropArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropArea.style.borderColor = 'blue';
+});
 
-    dropArea.addEventListener('dragleave', (e) => {
-      e.preventDefault();
-      dropArea.style.borderColor = '#aaa';
-    });
 
-    dropArea.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropArea.style.borderColor = '#aaa';
-      handleFiles(e.dataTransfer.files);
-    });
 
-    function handleFiles(files) {
-      for (const file of files) {
-        if (!uploadedFiles.some(f => f.name === file.name && f.size === file.size)) {
-          uploadedFiles.push(file);
-        }
-      }
-      renderFileList();
-    }
 
-    function renderFileList() {
-      fileListDiv.innerHTML = '';
-      if (uploadedFiles.length === 0) {
-        fileListDiv.innerHTML = '<p>No files selected.</p>';
-        return;
-      }
-      uploadedFiles.forEach((file, i) => {
-        const fileItem = document.createElement('div');
-        fileItem.style.marginBottom = '5px';
+  dropArea.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    dropArea.style.borderColor = '#aaa';
 
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = 'fileCheck' + i;
-        checkbox.value = i;
-        checkbox.checked = true;
 
-        const label = document.createElement('label');
-        label.htmlFor = checkbox.id;
-        label.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+});
 
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.textContent = 'Remove';
-        removeBtn.style.marginLeft = '10px';
-        removeBtn.onclick = () => {
-          uploadedFiles.splice(i, 1);
-          renderFileList();
-        };
 
-        fileItem.appendChild(checkbox);
-        fileItem.appendChild(label);
-        fileItem.appendChild(removeBtn);
 
-        fileListDiv.appendChild(fileItem);
-      });
-    }
+  dropArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropArea.style.borderColor = '#aaa';
+    handleFiles(e.dataTransfer.files);
+});
 
-    uploadForm.addEventListener('submit', (e) => {
-      e.preventDefault();
 
-      const formData = new FormData();
 
-      const selectedIndexes = [];
-      fileListDiv.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-        if (cb.checked) selectedIndexes.push(parseInt(cb.value));
-      });
 
-      if (selectedIndexes.length === 0) {
+  function handleFiles(files){
+    for (const file of files){
+      if (!uploadedFiles.some(f => f.name === file.name && f.size === file.size)) {
+        uploadedFiles.push(file);
+  }
+}
+
+    renderFileList();
+}
+
+
+
+  function renderFileList() {
+    fileListDiv.innerHTML = '';
+
+  if (uploadedFiles.length === 0){
+      fileListDiv.innerHTML = '<p>No files selected.</p>';
+      return;
+}
+
+
+    uploadedFiles.forEach((file, i) => {
+      const fileItem = document.createElement('div');
+      fileItem.style.marginBottom = '5px';
+
+
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = 'fileCheck' + i;
+    checkbox.value = i;
+    checkbox.checked = true;
+
+    const label = document.createElement('label');
+    label.htmlFor = checkbox.id;
+    label.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+
+    const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.textContent = 'Remove';
+      removeBtn.style.marginLeft = '10px';
+      removeBtn.onclick = () => {
+        uploadedFiles.splice(i, 1);
+        renderFileList();
+  };
+
+
+      fileItem.appendChild(checkbox);
+      fileItem.appendChild(label);
+      fileItem.appendChild(removeBtn);
+
+       fileListDiv.appendChild(fileItem);
+});
+}
+
+
+
+
+  uploadForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+
+    
+    
+  const formData = new FormData();
+
+
+  const selectedIndexes = [];
+    fileListDiv.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      
+      if (cb.checked) selectedIndexes.push(parseInt(cb.value));
+
+});
+
+
+
+      if (selectedIndexes.length === 0){
         alert('Please select at least one file to analyze.');
         return;
       }
 
+
+
+
       selectedIndexes.forEach(idx => {
         formData.append('csvfile', uploadedFiles[idx], uploadedFiles[idx].name);
       });
+
+
 
       fetch('/', {
         method: 'POST',
@@ -142,8 +189,11 @@
     });
 
     
+
     renderFileList();
   </script>
+
+
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -151,6 +201,7 @@
         const loadingIndicator = document.getElementById('loadingIndicator');
 
     loadingIndicator.style.display = 'none'; 
+
 
     form.addEventListener('submit', () => {
         loadingIndicator.style.display = 'block'; 
