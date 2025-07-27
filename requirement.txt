@@ -1,0 +1,7 @@
+flask
+dash
+pandas
+plotly
+matplotlib
+scipy
+gunicorn
