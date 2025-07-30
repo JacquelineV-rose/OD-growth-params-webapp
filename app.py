@@ -444,4 +444,5 @@ if __name__ == "__main__":
     cleanup_old_files(TEMP_UPLOAD_DIR)
     cleanup_old_files(app.config['RESULT_FOLDER'])
 
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
+
