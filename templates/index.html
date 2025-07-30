@@ -15,6 +15,7 @@
 
 
 
+
 <div id="drop-area">
   <p>Drag & drop files here or click to browse</p>
   <input type="file" name='csvfile' id="fileElem" multiple style="display:none" />
@@ -27,7 +28,7 @@
   <h3>Files to analyze:</h3>
   <form id="uploadForm" method="POST" enctype="multipart/form-data">
     <div id="file-list"></div>
-    <button type="submit">Analyze</button>
+    <button type="submit" id="analyze-btn">Analyze</button>
   </form>
 
 
@@ -152,42 +153,37 @@
 
 
   const selectedIndexes = [];
-    fileListDiv.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-      
-      if (cb.checked) selectedIndexes.push(parseInt(cb.value));
+  fileListDiv.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    if (cb.checked) selectedIndexes.push(parseInt(cb.value));
+  });
 
+  if (selectedIndexes.length === 0) {
+    alert('Please select at least one file to analyze.');
+    return;
+  }
+
+  for (const idx of selectedIndexes) {
+    const file = uploadedFiles[idx];
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      alert(`Incorrect file type: ${file.name}. Please upload CSV files only.`);
+      return; // stop submit if wrong type
+    }
+    formData.append('csvfile', file, file.name);
+  }
+
+  fetch('/', {
+    method: 'POST',
+    body: formData
+  })
+  .then(res => {
+    if (res.redirected) {
+      window.location.href = res.url;
+    } else {
+      return res.text().then(text => alert('Error: ' + text));
+    }
+  })
+  .catch(err => alert('Upload failed: ' + err.message));
 });
-
-
-
-      if (selectedIndexes.length === 0){
-        alert('Please select at least one file to analyze.');
-        return;
-      }
-
-
-
-
-      selectedIndexes.forEach(idx => {
-        formData.append('csvfile', uploadedFiles[idx], uploadedFiles[idx].name);
-      });
-
-
-
-      fetch('/', {
-        method: 'POST',
-        body: formData
-      })
-      .then(res => {
-        if (res.redirected) {
-          window.location.href = res.url;
-        } else {
-          return res.text().then(text => alert('Error: ' + text));
-        }
-      })
-      .catch(err => alert('Upload failed: ' + err.message));
-    });
-
     
 
     renderFileList();
