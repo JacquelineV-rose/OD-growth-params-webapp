@@ -16,7 +16,7 @@ To run:
 Run these commands in the terminal:
 
 
-docker build -t od-growth-app
+docker build -t od-growth-app .
 
 
 docker run -p 5000:5000 od-growth-app
