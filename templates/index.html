@@ -12,6 +12,21 @@
 
   <h1>Upload OD Data Files</h1>
 
+<div style="border: 1px solid #555; padding: 1em; background-color: #222; color: #eee; margin-bottom: 20px; border-radius: 8px;">
+  <h3 style="color: #fff;">How to Use This Tool</h3>
+  <ul>
+    <p><strong>1.</strong> Download the 
+    <a href="{{ url_for('static', filename='testing_sample/test_file.csv') }}" style="color: #4ea1ff;">
+      sample CSV
+    </a> or prepare your own CSV file using the same format.
+  </p>
+
+  <p><strong>2.</strong> Upload your file(s) using the "Browse Files" button or drag-and-drop into the upload area.</p>
+
+  <p><strong>3.</strong> Click <strong>Analyze</strong> to process your data and view the interactive results.</p>
+
+  <p><strong>4.</strong> Go to the Interactive tab to view plots and download summary results as TSV or PNG files.</p>
+</div>
 
 
 
@@ -205,6 +220,21 @@
 });
 
     </script>
+
+
+<section id="input-format" style="margin-top: 2rem;">
+  <h2 style="text-align: center;">Format Requirements</h2>
+  <p style="text-align: center;">Please make sure your CSV file includes the following in this order:</p>
+  <div style="text-align: center;">
+    <ul style="display: inline-block; text-align: left;">
+      <li>Time - Formatted as hh:mm:ss</li>
+      <li>T° 600</li>
+      <li>Well columns</li>
+    </ul>
+  </div>
+</section>
+
+
 
 
 
